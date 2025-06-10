@@ -1,0 +1,18 @@
+# Output file extensions
+*.csv
+*.mat
+*.nii*
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.npy
+*.zip
+*.tar*
+*.pdf
+
+# Directories
+__pycache__/
+*obsolete*
+data/
+EXPERIMENTS/
