@@ -10,9 +10,12 @@
 *.zip
 *.tar*
 *.pdf
+*.pt
 
 # Directories
 __pycache__/
+.spyproject/
 *obsolete*
 data/
+*trash*
 EXPERIMENTS/

@@ -120,9 +120,8 @@ class VAE(nn.Module):
 
 
 
-def train_model(train_loader, batch_size, epochs=10, z_dim = 16, device='cuda', annealing_epochs = 0, max_beta = 1):
+def train_model(model, train_loader, batch_size, epochs=10, z_dim = 16, device='cuda', annealing_epochs = 0, max_beta = 1):
   BCE, KL = [], []
-  model = VAE(z_dim=z_dim).to(device)
   model_opt = torch.optim.Adam(model.parameters())
   if annealing_epochs>0: betas = np.linspace(0.1,0.5,annealing_epochs)
   else: betas = max_beta*np.ones(epochs)

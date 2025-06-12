@@ -8,18 +8,18 @@ Created on Wed Feb 19 11:39:45 2025
 
 import torch
 from matplotlib import pyplot as plt
-from generators import  get_data_predictions, get_classes_mean
+from components.generators import  get_data_predictions, get_classes_mean
 import numpy as np
 import random
 from scipy.spatial.distance import euclidean
-from plotting import show_image, show_images_grid, plot_vae2d_trajectory, plot_vae2d_random_trajectory
+from visualization.plotting import show_image, show_images_grid, plot_vae2d_trajectory, plot_vae2d_random_trajectory
 import matplotlib.cm as cm
 from matplotlib import colors as cplt
 from components.update_rules import fp0
  
 def minimal_loop(train_loader, generator, discriminator, target_class, lambda_, n_iter, device,  
                  class_names, classes_mean, update_rule_func, p_scale_func=fp0,#identity_f_p, 
-                 z_current=None, ignore_discriminator = 0, random_state=0, noise_sigma=10,
+                 z_current=None, ignore_discriminator = 0, random_state=0, noise_sigma=torch.tensor(1.0),
                  title='', title_color = 'black', n_str = '', plot=False, warm_up = 5, stop_eps=1e-3,
                  **update_rule_kwargs):
     torch.manual_seed(random_state)

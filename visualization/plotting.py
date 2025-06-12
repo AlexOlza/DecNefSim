@@ -6,14 +6,14 @@ Created on Tue Mar 11 15:16:47 2025
 @author: alexolza
 """
 
-from torch import nn
+# from torch import nn
 import torch
-from tqdm import tqdm
+# from tqdm import tqdm
 from torch.distributions.normal import Normal
 from torchvision.utils import make_grid
 from matplotlib import pyplot as plt
 from umap.umap_ import UMAP
-from torch.distributions.kl import kl_divergence
+# from torch.distributions.kl import kl_divergence
 import numpy as np
 import pandas as pd
 from sklearn.manifold import TSNE
@@ -23,7 +23,7 @@ from matplotlib import colors as cplt
 import io
 from PIL import Image
 from scipy.stats import multivariate_normal
-from generators import get_data_predictions, get_classes_mean
+from components.generators import get_data_predictions, get_classes_mean
 
 def show_images_grid(images, class_num, ax, title, title_color='black', text=[], title_fontsize=26):
     grid = make_grid(images, nrow=class_num, normalize=True).permute(1,2,0).numpy()
@@ -105,7 +105,7 @@ def visualize_latent_space(model, data_loader, class_names, device, method='TSNE
                     data=df,
                     alpha=1, ax=ax_data
                 )
-        ax_data.set_title(f'{latents.shape[-1]}-D VAE Latent Space with UMAP ',fontsize= 22)  
+        ax_data.set_title(f'{latents.shape[-1]}-D VAE Latent Space with TSNE',fontsize= 22)  
     elif method == 'UMAP':
         reducer = UMAP()
         embedding = reducer.fit_transform(latents)
