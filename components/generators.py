@@ -111,7 +111,10 @@ class VAE(nn.Module):
 
   def forward(self, images):
     target_size = images.shape[-2:]  # (height, width)
-    if not hasattr(self, 'target_size'): self.target_size = target_size
+    if not hasattr(self, 'target_size'): 
+        # This way of assigning the attribute will make it available
+        # in state_dict, whereas self.attr = attr outside __init__ will not
+        self.register_buffer('target_size', target_size)
     z_dist = Normal(*self.encoder(images))
     # sample from distribution with reparametarazation trick
     z = z_dist.rsample()
@@ -119,7 +122,8 @@ class VAE(nn.Module):
     return decoding, z_dist
 
 
-
+# TODO: Feature enhancement - implement loss inside VAE class
+# TODO: Feature enhancement - save history inside VAE class as registered buffer
 def train_model(model, train_loader, batch_size, epochs=10, z_dim = 16, device='cuda', annealing_epochs = 0, max_beta = 1):
   BCE, KL = [], []
   model_opt = torch.optim.Adam(model.parameters())

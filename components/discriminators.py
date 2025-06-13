@@ -174,7 +174,9 @@ class ImageClassificationBase(nn.Module):
             self.epoch_end(epoch, result)
             history.append(result)
         
-        self.history = history
+        # This way of assigning the attribute will make it available
+        # in state_dict, whereas self.attr = attr outside __init__ will not
+        self.register_buffer('history', history)
         
         
 class CNNClassification(ImageClassificationBase):
