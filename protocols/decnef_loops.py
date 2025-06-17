@@ -43,9 +43,7 @@ def minimal_loop(train_loader, generator, discriminator, target_class, lambda_, 
     generated_images=[X0[0].cpu()]
     probabilities = [p.item()]
     all_probabilities = [p.item()]
-    # p0 = p.item()#+np.random.uniform(1e-4,1e-3)# abs(p.item()-1e-6)
     trajectory =[z_current.numpy().flatten()]
-    D = []
     sigmas = [noise_sigma]
     past_probabilities_mean = p.to(device)
     recent_probabilities_mean = p.to(device)
@@ -67,11 +65,7 @@ def minimal_loop(train_loader, generator, discriminator, target_class, lambda_, 
             z_new, _ = update_rule_func(z_current, recent_probabilities_mean, lambda_, p_scale_func, p0=past_probabilities_mean, 
                                         noise_sigma_0 = sigmas[-1].to(device), sigma0=sigmas[-1], 
                                         **update_rule_kwargs)
-            # z_new = update_rule_func(z_current, p, target_dist, lambda_, p_scale_func, p0=probabilities[0], **update_rule_kwargs)
-            # z_new, h_icdf = update_latent(z, mean, cov, p.cpu().item(), lambda_val, np.pi/2, random_noise)
-            # sigmas.append(noise_sigma)
             z_new = torch.tensor(z_new).float()
-            # z_new = (1 - lambda_) * z_current + lambda_ * h_icdf
             x_decoded = generator.decoder(z_new.to(device), generator.target_size)
             z_current = z_new
 
@@ -89,12 +83,8 @@ def minimal_loop(train_loader, generator, discriminator, target_class, lambda_, 
                 z_new, noise_sigma = update_rule_func(z_current, recent_probabilities_mean, lambda_, p_scale_func, p0=past_probabilities_mean, 
                                                       noise_sigma_0 = sigmas[-1].to(device), sigma0=sigmas[-1], 
                                                       **update_rule_kwargs)
-            # z_new = update_rule_func(z_current, p, target_dist, lambda_, p_scale_func, p0=probabilities[0], **update_rule_kwargs)
-            # z_new, h_icdf = update_latent(z, mean, cov, p.cpu().item(), lambda_val, np.pi/2, random_noise)
             sigmas.append(noise_sigma)
-            # print(sigmas[-2:])
             z_new = torch.tensor(z_new).float()
-            # z_new = (1 - lambda_) * z_current + lambda_ * h_icdf
             x_decoded = generator.decoder(z_new.to(device), generator.target_size)
             
             if ignore_discriminator:
@@ -108,10 +98,9 @@ def minimal_loop(train_loader, generator, discriminator, target_class, lambda_, 
             z_current = z_new
             trajectory.append(z_new.cpu().numpy().flatten())
             
-        probabilities.append(recent_probabilities_mean.item())  
-    Dnorm = np.array(D)#/D[0]
+        probabilities.append(recent_probabilities_mean.item()) 
     sigmas = np.array(sigmas)
-    return  generated_images, np.array(trajectory), Dnorm, np.array(probabilities), np.array(all_probabilities), sigmas
+    return  generated_images, np.array(trajectory), np.array(probabilities), np.array(all_probabilities), sigmas
 #%%
 def compute_single_trajectory(vae, discriminator, trajectory_random_seed,
              train_loader, target_class, update_rule_func, p_scale_func, trajectory_name, 
