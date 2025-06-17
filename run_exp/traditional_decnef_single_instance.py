@@ -49,7 +49,7 @@ else:
     non_target_class_idx = 1
     lambda_inv = 40
     gamma_inv = 40 
-    decnef_iters = 10
+    decnef_iters = 250
     ignore_discriminator = 0
     production = 0 
     generator_name = 'VAE'
@@ -162,3 +162,4 @@ sigma =  compute_single_trajectory(vae, discriminator,
                                    ignore_discriminator=ignore_discriminator,
                                    start_from_origin=True,
                                    )
+#%%

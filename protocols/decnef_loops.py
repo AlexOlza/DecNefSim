@@ -53,10 +53,9 @@ def minimal_loop(train_loader, generator, discriminator, target_class, lambda_, 
         if i>=150: 
             if (recent_probabilities_mean.item()>= 0.9) or sigmas[-1]<0.1:
                 patience-=1
-                print(f'iter {i}, patience: ', patience)
             else:
                 patience = patience0
-        if patience==0: break
+        if patience==0: print(f'iter {i}, Early Stopping'); break
         if i>1:
             recent_probabilities_mean = torch.tensor(np.mean(all_probabilities[-i*warm_up:])).to(device)
             past_probabilities_mean = torch.tensor(np.mean(all_probabilities[-(i+1)*warm_up: -i*warm_up])).to(device)
@@ -65,7 +64,7 @@ def minimal_loop(train_loader, generator, discriminator, target_class, lambda_, 
             z_new, _ = update_rule_func(z_current, recent_probabilities_mean, lambda_, p_scale_func, p0=past_probabilities_mean, 
                                         noise_sigma_0 = sigmas[-1].to(device), sigma0=sigmas[-1], 
                                         **update_rule_kwargs)
-            z_new = torch.tensor(z_new).float()
+            z_new = z_new.float()
             x_decoded = generator.decoder(z_new.to(device), generator.target_size)
             z_current = z_new
 
@@ -84,7 +83,7 @@ def minimal_loop(train_loader, generator, discriminator, target_class, lambda_, 
                                                       noise_sigma_0 = sigmas[-1].to(device), sigma0=sigmas[-1], 
                                                       **update_rule_kwargs)
             sigmas.append(noise_sigma)
-            z_new = torch.tensor(z_new).float()
+            z_new = z_new.float()
             x_decoded = generator.decoder(z_new.to(device), generator.target_size)
             
             if ignore_discriminator:
@@ -94,7 +93,7 @@ def minimal_loop(train_loader, generator, discriminator, target_class, lambda_, 
                     p =  torch.nn.Softmax()(discriminator(x_decoded).flatten())[idx]
 
             all_probabilities.append(p.item())
-            generated_images.append(x_decoded[0].cpu())
+            generated_images.append(x_decoded[0].cpu().numpy())
             z_current = z_new
             trajectory.append(z_new.cpu().numpy().flatten())
             
@@ -357,10 +356,9 @@ def minimal_loop_legacy(train_loader, generator, discriminator, target_class, la
         if i>=150: 
             if (recent_probabilities_mean.item()>= 0.9) or sigmas[-1]<0.1:
                 patience-=1
-                print(f'iter {i}, patience: ', patience)
             else:
                 patience = patience0
-        if patience==0: break
+        if patience==0: print(f'iter {i}, Early Stopping'); break
         if i>1:
             recent_probabilities_mean = torch.tensor(np.mean(all_probabilities[-i*warm_up:])).to(device)
             past_probabilities_mean = torch.tensor(np.mean(all_probabilities[-(i+1)*warm_up: -i*warm_up])).to(device)
