@@ -127,8 +127,8 @@ def visualize_latent_space(model, data_loader, class_names, device, method='TSNE
 
 def visual_eval_vae(vae, vae_history, z_dim, train_loader, class_names, class_numbers, device='cuda'):
     fig_loss, ax = plt.subplots(1,2)
-    bce = vae_history.BCE_loss.plot(title = f'BCE loss (z_dim = {z_dim})', ax = ax[0])
-    kl = vae_history.KL_div.plot(title = f'KL divergence (z_dim = {z_dim})',ax=ax[1])
+    bce = vae_history.train_BCE.plot(title = f'BCE loss (z_dim = {z_dim})', ax = ax[0])
+    kl = vae_history.train_KL.plot(title = f'KL divergence (z_dim = {z_dim})',ax=ax[1])
     i=0
     rec, ax = plt.subplots(2, 3)
     for img, lbl in train_loader:
