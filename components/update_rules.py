@@ -109,8 +109,8 @@ def update_z_moving_normal_drift(z, p, target_dist, lambda_val, f_p, device='cud
 
 def update_z_moving_normal_drift_adaptive_variance(z, p, lambda_val, f_p, device='cuda', max_sigma=1, noise_sigma_0 =1, **f_p_kwargs):
     # noise_sigma = (1-lambda_val) *noise_sigma_0 + lambda_val * f_p(p.cpu(),**f_p_kwargs)
-    noise_sigma = torch.tensor((1-lambda_val) *noise_sigma_0 + lambda_val * f_p(p.cpu(),**f_p_kwargs)).cpu()
-    noise_sigma = torch.tensor(min(noise_sigma, max_sigma)).cpu()
+    noise_sigma = ((1-lambda_val) *noise_sigma_0 + lambda_val * f_p(p.cpu(),**f_p_kwargs)).cpu()
+    noise_sigma = torch.tensor(min(noise_sigma.item(), max_sigma)).cpu()
     noise_cov = noise_sigma*torch.eye(z.shape[-1]).cpu()
     noise_dist = MultivariateNormal(z.cpu(), covariance_matrix=noise_cov)
     normal_update = noise_dist.sample().to(device)

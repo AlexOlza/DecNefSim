@@ -40,7 +40,7 @@ def minimal_loop(train_loader, generator, discriminator, target_class, lambda_, 
         d_str = 'Discr.'
         with torch.no_grad():
             p =  torch.nn.Softmax()(discriminator(X0).flatten())[idx]
-    generated_images=[X0[0].cpu()]
+    generated_images=[X0[0].cpu().detach().numpy()]
     probabilities = [p.item()]
     all_probabilities = [p.item()]
     trajectory =[z_current.numpy().flatten()]
@@ -93,7 +93,7 @@ def minimal_loop(train_loader, generator, discriminator, target_class, lambda_, 
                     p =  torch.nn.Softmax()(discriminator(x_decoded).flatten())[idx]
 
             all_probabilities.append(p.item())
-            generated_images.append(x_decoded[0].cpu().numpy())
+            generated_images.append(x_decoded[0].cpu().detach().numpy())
             z_current = z_new
             trajectory.append(z_new.cpu().numpy().flatten())
             
@@ -111,8 +111,16 @@ def compute_single_trajectory(vae, discriminator, trajectory_random_seed,
     np.random.seed(trajectory_random_seed)
     torch.cuda.manual_seed(trajectory_random_seed)
     z_current = None if start_from_origin else torch.normal(0.,1.,(1, 2))#starting_zs[iter_]
-    generated_images, trajectory, probabilities, all_probabilities, sigma  = minimal_loop(train_loader, vae, discriminator, target_class, lambda_, n_iter, device,
-                                                                                          update_rule_func, p_scale_func,z_current, ignore_discriminator)
+    generated_images,\
+    trajectory,\
+    probabilities,\
+    all_probabilities,\
+    sigma  = minimal_loop(train_loader, vae, discriminator, 
+                          target_class, lambda_, n_iter, device,
+                          update_rule_func, p_scale_func,z_current,
+                          ignore_discriminator, 
+                          random_state=trajectory_random_seed
+                          )
     return generated_images, trajectory, probabilities, all_probabilities, sigma
 
 def show_trajectories(vae_2d, discriminator, train_loader, target_class, class_names, update_rule_func, p_scale_func, filename, extension='png',

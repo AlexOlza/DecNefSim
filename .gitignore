@@ -11,6 +11,7 @@
 *.tar*
 *.pdf
 *.pt
+*.npz
 
 # Directories
 __pycache__/
