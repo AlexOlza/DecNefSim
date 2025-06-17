@@ -133,7 +133,8 @@ class ImageClassificationBase(nn.Module):
         return {'val_loss': epoch_loss.item(), 'val_acc': epoch_acc.item()}
     
     def epoch_end(self, epoch, result):
-        print("Epoch [{}], train_loss: {:.4f}, val_loss: {:.4f}, val_acc: {:.4f}".format(
+        if self.verbose: 
+            print("Epoch [{}], train_loss: {:.4f}, val_loss: {:.4f}, val_acc: {:.4f}".format(
             epoch, result['train_loss'], result['val_loss'], result['val_acc']))
 
 
@@ -154,8 +155,8 @@ class ImageClassificationBase(nn.Module):
         return self.validation_epoch_end(outputs)
 
       
-    def fit(self, epochs, lr, train_loader, val_loader, opt_func = torch.optim.SGD):
-        
+    def fit(self, epochs, lr, train_loader, val_loader, opt_func = torch.optim.SGD, verbose=0):
+        self.verbose = verbose
         history = []
         optimizer = opt_func(self.parameters(),lr)
         for epoch in range(epochs):
@@ -174,10 +175,25 @@ class ImageClassificationBase(nn.Module):
             self.epoch_end(epoch, result)
             history.append(result)
         
-        # This way of assigning the attribute will make it available
-        # in state_dict, whereas self.attr = attr outside __init__ will not
-        self.register_buffer('history', history)
-        
+        self.history = history
+    def save(self, path):
+        torch.save({
+            'model_state_dict': self.state_dict(),
+            'extra_attributes': {
+                'history': self.history
+            }
+        }, path)
+
+    def load(self, path, strict=True):
+        checkpoint = torch.load(path, map_location='cpu')
+        self.load_state_dict(checkpoint['model_state_dict'], strict=strict)
+        extras = checkpoint.get('extra_attributes', {})
+        for key, value in extras.items():
+            setattr(self, key, value)
+    def history_to_df(self):
+        return pd.DataFrame(self.history,
+                            columns = ['train_loss','val_loss','val_acc'])
+    
         
 class CNNClassification(ImageClassificationBase):
     def __init__(self, image_shape, classes, device='cuda', name = 'CNN classifer'):

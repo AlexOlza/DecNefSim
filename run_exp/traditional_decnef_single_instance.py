@@ -70,7 +70,6 @@ lambda_ = 1/lambda_inv # A common value could be 0.025 which is 1/40
 generator_epochs = 20
 device='cuda'
 generator_batch_size=64
-generator_model = VAE(z_dim=z_dim).to(device)
 
 discriminator_epochs = 10
 discriminator_batch_size = 16
@@ -110,22 +109,22 @@ class_numbers = class_numbers.astype(int)
 img_size = trainset[0][0].shape[-1]
 #%%
 if not os.path.exists(generator_fname+'.pt'):
-    vae, vae_history = train_model(generator_model, train_loader,generator_batch_size, epochs=generator_epochs, z_dim=z_dim)
+    vae = VAE(z_dim=z_dim).to(device)
+    vae.fit(train_loader, 2, generator_batch_size)
+    vae_history = vae.history_to_df()
     print(f'{generator_name} TRAINING FINISHED WITH z_dim=',z_dim)
     #%%
-    torch.save(vae.state_dict(), generator_fname+'.pt')
-    vae_history.to_csv(generator_fname+'_history.csv', index=False)
+    vae.save(generator_fname+'.pt')
     eval_figs = visual_eval_vae(vae, vae_history, z_dim, train_loader, class_names, class_numbers)
     fignames = [f'{generator_name}_{name}.{ext}' for name in ['LOSS','REC','PROT','LATENT_VIS', 'LATENT_TRAV']]
     for figure, figurename in zip(eval_figs, fignames):
         figure.savefig(os.path.join(genfigpath, figurename), format=ext)
 else:
-    vae = generator_model
-    state_dict = torch.load(generator_fname+'.pt')
-    vae.load_state_dict(state_dict)
-    vae.to(device)
-    vae_history = pd.read_csv(generator_fname+'_history.csv')
+    vae = VAE(z_dim=z_dim).to(device)
+    vae.load(generator_fname+'.pt')
+    vae_history = vae.history_to_df()
     print(f'Loaded {generator_fname}')
+
 #%%
 classes = trainset.targets.unique().numpy()
 class_names = trainset.classes
@@ -141,10 +140,9 @@ if not os.path.exists(discriminator_fname):
     testl = BinaryDataLoader(testset, tgt_non_tgt, batch_size=16) 
     discriminator.evaluate(testl)
     discriminator.fit( epochs=discriminator_epochs, lr=1e-3, train_loader=tl, val_loader = testl)
-    torch.save(discriminator.state_dict(), discriminator_fname)
+    discriminator.save(discriminator_fname)
 else:
-    state_dict = torch.load(discriminator_fname)
-    discriminator.load_state_dict(state_dict)
+    discriminator.load(discriminator_fname)
     discriminator.to(device)
     print(f'Loaded {discriminator_fname}')
 

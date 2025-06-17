@@ -103,27 +103,103 @@ class Decoder(nn.Module):
 
 
 class VAE(nn.Module):
-  def __init__(self, z_dim=32, im_chan=1):
-    super(VAE, self).__init__()
-    self.z_dim = z_dim
-    self.encoder = Encoder(im_chan, z_dim)
-    self.decoder = Decoder(z_dim, im_chan)
+    def __init__(self, z_dim=32, im_chan=1, device='cuda'):
+      super(VAE, self).__init__()
+      self.z_dim = z_dim
+      self.encoder = Encoder(im_chan, z_dim)
+      self.decoder = Decoder(z_dim, im_chan)
+      self.device = device
+    
+    def save(self, path):
+        torch.save({
+            'model_state_dict': self.state_dict(),
+            'extra_attributes': {
+                'target_size': self.target_size,
+                'history': self.history
+            }
+        }, path)
 
-  def forward(self, images):
-    target_size = images.shape[-2:]  # (height, width)
-    if not hasattr(self, 'target_size'): 
-        # This way of assigning the attribute will make it available
-        # in state_dict, whereas self.attr = attr outside __init__ will not
-        self.register_buffer('target_size', target_size)
-    z_dist = Normal(*self.encoder(images))
-    # sample from distribution with reparametarazation trick
-    z = z_dist.rsample()
-    decoding = self.decoder(z, target_size)
-    return decoding, z_dist
+    def load(self, path, strict=True):
+        checkpoint = torch.load(path, map_location='cpu')
+        self.load_state_dict(checkpoint['model_state_dict'], strict=strict)
+        extras = checkpoint.get('extra_attributes', {})
+        for key, value in extras.items():
+            setattr(self, key, value)
+    
+    def forward(self, images):
+      target_size = images.shape[-2:]  # (height, width)
+      if not hasattr(self, 'target_size'): 
+          self.target_size = target_size
+      z_dist = Normal(*self.encoder(images))
+      # sample from distribution with reparametarazation trick
+      z = z_dist.rsample()
+      decoding = self.decoder(z, target_size)
+      return decoding, z_dist
+  
+    def training_step(self, batch, beta):
+        images = batch.to(self.device)
+        recon_images, encoding = self(images)
+        bce = reconstruction_loss(recon_images, images)#/(torch.Tensor([np.prod(list(model.target_size))]).to(device))
+        kl = kl_divergence_loss(encoding)
+        loss = bce+ beta*kl 
+        return loss, bce, kl
+    """
+    Currently unused, could be called inside fit
+    (requiring val_loader as fit arg)
+    
+    def validation_step(self, batch):
+        images = batch.to(self.device)
+        recon_images, encoding = self(images)
+        bce = reconstruction_loss(recon_images, images)#/(torch.Tensor([np.prod(list(model.target_size))]).to(device))
+        kl = kl_divergence_loss(encoding)
+        return {'val_BCE': bce.detach(), 'val_KL': kl.detach()}
+        
+    def validation_epoch_end(self, outputs):
+        batch_BCEs = [x['val_BCE'] for x in outputs]
+        epoch_BCE = torch.stack(batch_BCEs).mean() 
+        batch_KLs = [x['val_KL'] for x in outputs]
+        epoch_KL = torch.stack(batch_KLs).mean() 
+        return {'val_BCE': epoch_BCE.item(), 'val_KL': epoch_KL.item()}
+    
+    def epoch_end(self, epoch, result):
+        if self.verbose:
+            # Not tested, might break because I've not checked dict keys
+            print("Epoch [{}], train_loss: {:.4f}, val_loss: {:.4f}".format(
+            epoch, result['train_loss'], result['val_loss']))
+
+    @torch.no_grad()
+    def evaluate(self, val_loader):
+        self.eval()
+        outputs = [self.validation_step(batch) for batch in val_loader]
+        return self.validation_epoch_end(outputs)
+
+    """  
+    def fit(self, train_loader, epochs, batch_size, opt_func = torch.optim.Adam, annealing_epochs = 0, max_beta = 1, verbose=0):
+        self.verbose = verbose
+        history = [] 
+        optimizer = opt_func(self.parameters()) # Using default lr
+        if annealing_epochs>0: betas = np.linspace(0.1,0.5,annealing_epochs)
+        else: betas = max_beta*np.ones(epochs)
+        for epoch in range(epochs):
+            epoch_loss, epoch_bce, epoch_kl = [], [], []
+            beta = betas[epoch] if epoch< len(betas) else max_beta
+            self.train()
+            for batch, step in train_loader:
+                loss, bce, kl = self.training_step(batch, beta)
+                epoch_loss.append(loss); epoch_bce.append(bce); epoch_kl.append(kl)
+                loss.backward()
+                optimizer.step()
+                optimizer.zero_grad()       
+            # self.epoch_end(epoch, result) # only for printing (when verbose)
+            history.append([torch.stack(epoch_loss).mean().item(),
+                            torch.stack(epoch_kl).mean().item(),
+                            torch.stack(epoch_kl).mean().item()])
+            self.history = history
+    def history_to_df(self):
+        return pd.DataFrame(self.history,
+                            columns = ['train_loss','train_BCE','train_KL'])
 
 
-# TODO: Feature enhancement - implement loss inside VAE class
-# TODO: Feature enhancement - save history inside VAE class as registered buffer
 def train_model(model, train_loader, batch_size, epochs=10, z_dim = 16, device='cuda', annealing_epochs = 0, max_beta = 1):
   BCE, KL = [], []
   model_opt = torch.optim.Adam(model.parameters())
