@@ -115,7 +115,8 @@ class VAE(nn.Module):
             'model_state_dict': self.state_dict(),
             'extra_attributes': {
                 'target_size': self.target_size,
-                'history': self.history
+                'history': self.history,
+                'prototypes': self.prototypes
             }
         }, path)
 
@@ -199,7 +200,33 @@ class VAE(nn.Module):
         return pd.DataFrame(self.history,
                             columns = ['train_loss','train_BCE','train_KL'])
 
+    def compute_prototypes(self, data_loader, device = 'cuda'):
+        self.eval()
+        latents_mean = []
+        latents_std = []
+        labels = []
+        with torch.no_grad():
+            for i, (data, label) in enumerate(data_loader):
+              mu, std = self.encoder(data.to(device))
+              latents_mean.append(mu.cpu())
+              latents_std.append(std.cpu())
+              labels.append(label.cpu())
+        latents_mean = torch.cat(latents_mean, dim=0)
+        latents_std = torch.cat(latents_std, dim=0)
+        labels = torch.cat(labels, dim=0)
+        classes_mean = {}
+        for class_name in np.unique(labels):
+          latents_mean_class = latents_mean[labels==class_name]
+          latents_mean_class = latents_mean_class.mean(dim=0, keepdims=True).detach().numpy()
 
+          latents_std_class = latents_std[labels==class_name]
+          latents_std_class = latents_std_class.mean(dim=0, keepdims=True).detach().numpy()
+
+          classes_mean[class_name] = [latents_mean_class, latents_std_class]
+        
+        self.prototypes = classes_mean  
+          
+          
 def train_model(model, train_loader, batch_size, epochs=10, z_dim = 16, device='cuda', annealing_epochs = 0, max_beta = 1):
   BCE, KL = [], []
   model_opt = torch.optim.Adam(model.parameters())
