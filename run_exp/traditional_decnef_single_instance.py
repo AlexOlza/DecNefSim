@@ -8,7 +8,6 @@ Created on Thu Jun 12 15:22:00 2025
 import sys
 sys.path.append('..')
 import torch
-from tqdm import tqdm
 import os
 import regex as re
 import pandas as pd
@@ -16,10 +15,9 @@ import numpy as np
 from torch.utils.data import DataLoader
 from torchvision import transforms, datasets
 ###########################
-from components.generators import VAE, train_model, get_data_predictions, get_classes_mean
-from visualization.plotting import visual_eval_vae
+from components.generators import VAE
 from protocols.decnef_loops import compute_single_trajectory
-from components.discriminators import CNNClassification, BinaryDataLoader, plot_predicted_probability_distribution
+from components.discriminators import CNNClassification, BinaryDataLoader
 from components.update_rules import update_z_moving_normal_drift_adaptive_variance, powsig
 #%%
 """
@@ -44,12 +42,12 @@ if read_args==1:
     ext = 'png' if production==0 else 'pdf'
 else:
     EXP_NAME = 'trash'
-    trajectory_random_seed = 0 
+    trajectory_random_seed = 1
     target_class_idx = 0 
     non_target_class_idx = 1
     lambda_inv = 40
     gamma_inv = 40 
-    decnef_iters = 250
+    decnef_iters = 500
     ignore_discriminator = 0
     production = 0 
     generator_name = 'VAE'
@@ -81,10 +79,8 @@ generator_fname = os.path.join(modelpath, generator_name)
 #%%
 nfb_traj_figpath = os.path.join(nfbfigpath,'VAE2D_trajectories')
 dis_pdist_figpath = os.path.join(disfigpath,'probabilities_by_classifier') 
-reconstruction_path = outpath + 'reconstructions'
-
 for p in [genfigpath, dis_pdist_figpath,
-          nfb_traj_figpath, reconstruction_path,
+          nfb_traj_figpath, 
           modelpath]:
     if not os.path.exists(p):
         os.makedirs(p)
@@ -110,15 +106,16 @@ img_size = trainset[0][0].shape[-1]
 #%%
 if not os.path.exists(generator_fname+'.pt'):
     vae = VAE(z_dim=z_dim).to(device)
-    vae.fit(train_loader, 2, generator_batch_size)
+    vae.fit(train_loader, generator_epochs, generator_batch_size)
+    vae.compute_prototypes(train_loader)
     vae_history = vae.history_to_df()
     print(f'{generator_name} TRAINING FINISHED WITH z_dim=',z_dim)
     #%%
     vae.save(generator_fname+'.pt')
-    eval_figs = visual_eval_vae(vae, vae_history, z_dim, train_loader, class_names, class_numbers)
-    fignames = [f'{generator_name}_{name}.{ext}' for name in ['LOSS','REC','PROT','LATENT_VIS', 'LATENT_TRAV']]
-    for figure, figurename in zip(eval_figs, fignames):
-        figure.savefig(os.path.join(genfigpath, figurename), format=ext)
+    # eval_figs = visual_eval_vae(vae, vae_history, z_dim, train_loader, class_names, class_numbers)
+    # fignames = [f'{generator_name}_{name}.{ext}' for name in ['LOSS','REC','PROT','LATENT_VIS', 'LATENT_TRAV']]
+    # for figure, figurename in zip(eval_figs, fignames):
+    #     figure.savefig(os.path.join(genfigpath, figurename), format=ext)
 else:
     vae = VAE(z_dim=z_dim).to(device)
     vae.load(generator_fname+'.pt')
@@ -163,3 +160,26 @@ sigma =  compute_single_trajectory(vae, discriminator,
                                    start_from_origin=True,
                                    )
 #%%
+np.savez_compressed(outpath + f'{trajectory_name}.npz', 
+                    generated_images = generated_images,
+                    trajectory = trajectory,
+                    probabilities = probabilities,
+                    all_probabilities = all_probabilities,
+                    sigma = sigma
+                    )
+#%%
+if not read_args:
+    out = np.load(outpath +f'{trajectory_name}.npz')
+    from visualization.plotting import show_image
+    from matplotlib import pyplot as plt
+    
+    fig, axs = plt.subplots(1,10)
+    for ax, i in zip(axs, [0,10,30,50,80, 100, 110, 120, 130, -1]):
+        ax.imshow(out['generated_images'][i][0])
+        
+    pd.DataFrame(out['probabilities']).plot()
+    pd.DataFrame(out['sigma']).plot()
+
+
+    target_prototype = vae.prototypes[target_class_idx][0].reshape(1,-1)
+    dist = pd.DataFrame([np.sum((trajectory[i].reshape(1,-1)-target_prototype)**2) for i in range(len(trajectory))])
