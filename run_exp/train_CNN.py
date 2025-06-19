@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Thu Jun 12 15:22:00 2025
+Created on Wed Jun 18 10:12:20 2025
 
 @author: alexolza
 """
@@ -10,21 +10,13 @@ sys.path.append('..')
 import torch
 import os
 import regex as re
-import pandas as pd
 import numpy as np
 from torch.utils.data import DataLoader
 from torchvision import transforms, datasets
 ###########################
-from components.generators import VAE
-from protocols.decnef_loops import compute_single_trajectory
 from components.discriminators import CNNClassification, BinaryDataLoader
-from components.update_rules import update_z_moving_normal_drift_adaptive_variance, powsig, update_z_moving_normal_drift_adaptive_variance_memory
 #%%
-"""
-Configuration variables
-"""
 global_random_seed = 42
-p_scale_func = powsig
 read_args = int(eval(sys.argv[1])) # Whether to use manual parameters, or read args
 if read_args==1:
     EXP_NAME = sys.argv[2] # Output directory
@@ -40,39 +32,31 @@ if read_args==1:
     generator_name = 'VAE'
     discriminator_type = 'CNN'
     ext = 'png' if production==0 else 'pdf'
+    ext = 'png' if production==0 else 'pdf'
 else:
     EXP_NAME = 'trash'
     trajectory_random_seed = 1
-    target_class_idx = 3
+    target_class_idx = 0 
     non_target_class_idx = 1
     lambda_inv = 40
     gamma_inv = 40 
     decnef_iters = 500
-    ignore_discriminator = 1
+    ignore_discriminator = 0
     update_rule_idx = 0
     production = 0 
     generator_name = 'VAE'
     discriminator_type = 'CNN'
     ext = 'png' if production==0 else 'pdf'
 
-
-figpath = f'../EXPERIMENTS/{EXP_NAME}/figures/'
 outpath = f'../EXPERIMENTS/{EXP_NAME}/output/'
 modelpath = f'../EXPERIMENTS/{EXP_NAME}/weights/'
-genfigpath = figpath+'generator_eval'
-disfigpath = figpath+'discriminator_eval'
-nfbfigpath = figpath+'nfb_eval'
-update_rules = [update_z_moving_normal_drift_adaptive_variance, 
-                update_z_moving_normal_drift_adaptive_variance_memory
-                ]
-update_rule_names = ['MNDAV', 'MNDAVMem']
+
 
 z_dim = 2
 lambda_ = 1/lambda_inv # A common value could be 0.025 which is 1/40
 generator_epochs = 20
 device='cuda'
 generator_batch_size=64
-update_rule_func, update_rule_name = update_rules[update_rule_idx], update_rule_names[update_rule_idx]
 
 discriminator_epochs = 10
 discriminator_batch_size = 16
@@ -82,11 +66,7 @@ generator_name = f'{generator_name}_Z{z_dim}_BS{generator_batch_size}_E{generato
 generator_fname = os.path.join(modelpath, generator_name)
 
 #%%
-nfb_traj_figpath = os.path.join(nfbfigpath,'VAE2D_trajectories')
-dis_pdist_figpath = os.path.join(disfigpath,'probabilities_by_classifier') 
-for p in [genfigpath, dis_pdist_figpath,
-          nfb_traj_figpath, 
-          modelpath]:
+for p in [outpath, modelpath]:
     if not os.path.exists(p):
         os.makedirs(p)
 #%%
@@ -109,25 +89,6 @@ class_names, class_numbers = np.array([[k,v] for k,v in class_name_dict.items()]
 class_numbers = class_numbers.astype(int)
 img_size = trainset[0][0].shape[-1]
 #%%
-if not os.path.exists(generator_fname+'.pt'):
-    vae = VAE(z_dim=z_dim).to(device)
-    vae.fit(train_loader, generator_epochs, generator_batch_size)
-    vae.compute_prototypes(train_loader)
-    vae_history = vae.history_to_df()
-    print(f'{generator_name} TRAINING FINISHED WITH z_dim=',z_dim)
-    #%%
-    vae.save(generator_fname+'.pt')
-    # eval_figs = visual_eval_vae(vae, vae_history, z_dim, train_loader, class_names, class_numbers)
-    # fignames = [f'{generator_name}_{name}.{ext}' for name in ['LOSS','REC','PROT','LATENT_VIS', 'LATENT_TRAV']]
-    # for figure, figurename in zip(eval_figs, fignames):
-    #     figure.savefig(os.path.join(genfigpath, figurename), format=ext)
-else:
-    vae = VAE(z_dim=z_dim).to(device)
-    vae.load(generator_fname+'.pt')
-    vae_history = vae.history_to_df()
-    print(f'Loaded {generator_fname}')
-
-#%%
 classes = trainset.targets.unique().numpy()
 class_names = trainset.classes
 combo_names = [list(class_names)[i] for i in tgt_non_tgt]
@@ -143,49 +104,6 @@ if not os.path.exists(discriminator_fname):
     discriminator.evaluate(testl)
     discriminator.fit( epochs=discriminator_epochs, lr=1e-3, train_loader=tl, val_loader = testl)
     discriminator.save(discriminator_fname)
+    print(f'Saved {discriminator_fname}, exiting')
 else:
-    discriminator.load(discriminator_fname)
-    discriminator.to(device)
-    print(f'Loaded {discriminator_fname}')
-
-#%%
-trajectory_name = f'TRAJ{trajectory_random_seed}_{generator_name}_{discriminator_name}_UR{update_rule_name}_IGDIS{ignore_discriminator}'
-generated_images,\
-trajectory,\
-probabilities,\
-all_probabilities,\
-sigma =  compute_single_trajectory(vae, discriminator,
-                                   trajectory_random_seed,
-                                   train_loader, target_class_idx,
-                                   update_rule_func, p_scale_func,
-                                   trajectory_name=trajectory_name, 
-                                   n_iter = decnef_iters, lambda_ = lambda_,
-                                   device=device, 
-                                   ignore_discriminator=ignore_discriminator,
-                                   start_from_origin=True,
-                                   )
-#%%
-np.savez_compressed(outpath + f'{trajectory_name}.npz', 
-                    generated_images = generated_images,
-                    trajectory = trajectory,
-                    probabilities = probabilities,
-                    all_probabilities = all_probabilities,
-                    sigma = sigma
-                    )
-print('Saved ',outpath + f'{trajectory_name}.npz', ', exiting.')
-#%%
-if not read_args:
-    out = np.load(outpath +f'{trajectory_name}.npz')
-    from visualization.plotting import show_image
-    from matplotlib import pyplot as plt
-    
-    fig, axs = plt.subplots(1,10)
-    for ax, i in zip(axs, [0,10,30,50,80, 100, 110, 120, 130, -1]):
-        ax.imshow(out['generated_images'][i][0])
-        
-    pd.DataFrame(out['probabilities']).plot()
-    pd.DataFrame(out['sigma']).plot()
-
-
-    target_prototype = vae.prototypes[target_class_idx][0].reshape(1,-1)
-    dist = pd.DataFrame([np.sum((trajectory[i].reshape(1,-1)-target_prototype)**2) for i in range(len(trajectory))])
+    print(f'Found {discriminator_fname}, exiting')

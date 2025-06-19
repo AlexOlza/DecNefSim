@@ -118,3 +118,18 @@ def update_z_moving_normal_drift_adaptive_variance(z, p, lambda_val, f_p, device
     # z_new =  (1-lambda_val) * p * z.to(device) + lambda_val * (1-p) * normal_update # regression to 0,0, WHY?????? seemed to make sense :(
     # z_new =  (1-lambda_val * p) * z.to(device) + lambda_val * (1-p) * normal_update # blowing dist and sigma!!!!!!!!!
     return z_new, noise_sigma
+
+def update_z_moving_normal_drift_adaptive_variance_memory(z, p, lambda_val, f_p, z_previous, retreat = False, device='cuda', max_sigma=1, noise_sigma_0 =1, **f_p_kwargs):
+    if retreat: # This will be true if z_{i+1} is worse than z_i
+        # Since z_{i+1} was bad, we return to z_i and we adopt a more exploratory strategy 
+        noise_sigma = ((1-lambda_val) *noise_sigma_0 + lambda_val * f_p(p.cpu(),**f_p_kwargs)).cpu()
+        # Bad z_{i+1} should make noise_sigma > noise_sigma_0, but kust in case we take the maximum
+        noise_sigma = torch.tensor(min(max(noise_sigma.item(), noise_sigma_0.item()),
+                                       max_sigma)).cpu()
+        noise_cov = noise_sigma*torch.eye(z.shape[-1]).cpu()
+        noise_dist = MultivariateNormal(z_previous.cpu(), covariance_matrix=noise_cov)
+        normal_update = noise_dist.sample().to(device)
+        z_new =  (1-lambda_val) * z_previous.to(device) + lambda_val * normal_update
+    else:
+        z_new, noise_sigma = update_z_moving_normal_drift_adaptive_variance(z, p, lambda_val, f_p, device, max_sigma, noise_sigma_0, **f_p_kwargs)
+    return z_new, noise_sigma

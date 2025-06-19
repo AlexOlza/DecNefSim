@@ -33,7 +33,7 @@ def minimal_loop(train_loader, generator, discriminator, target_class, lambda_, 
 
     X0 = generator.decoder(z_current.to(device), generator.target_size)
  
-    if ignore_discriminator:
+    if ignore_discriminator!=0:
         p = torch.rand(1)
         d_str = 'Random p'
     else:
@@ -60,7 +60,8 @@ def minimal_loop(train_loader, generator, discriminator, target_class, lambda_, 
             recent_probabilities_mean = torch.tensor(np.mean(all_probabilities[-i*warm_up:])).to(device)
             past_probabilities_mean = torch.tensor(np.mean(all_probabilities[-(i+1)*warm_up: -i*warm_up])).to(device)
             # print(past_probabilities_mean, recent_probabilities_mean, sigmas[-1], z_current)
-        for j in range(2*warm_up):   
+        for j in range(2*warm_up): 
+            # TODO: Modify to accomodate URs with memory (potentially passing the whole trajectory and dealing with it inside the UR func)
             z_new, _ = update_rule_func(z_current, recent_probabilities_mean, lambda_, p_scale_func, p0=past_probabilities_mean, 
                                         noise_sigma_0 = sigmas[-1].to(device), sigma0=sigmas[-1], 
                                         **update_rule_kwargs)
@@ -118,7 +119,7 @@ def compute_single_trajectory(vae, discriminator, trajectory_random_seed,
     sigma  = minimal_loop(train_loader, vae, discriminator, 
                           target_class, lambda_, n_iter, device,
                           update_rule_func, p_scale_func,z_current,
-                          ignore_discriminator, 
+                          ignore_discriminator=ignore_discriminator, 
                           random_state=trajectory_random_seed
                           )
     return generated_images, trajectory, probabilities, all_probabilities, sigma
