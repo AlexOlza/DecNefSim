@@ -175,13 +175,16 @@ def visual_eval_vae(vae, vae_history, z_dim, train_loader, class_names, class_nu
 def plot_gaussians(classes_mean, class_names, target_class, cmaps, ax, zoomed=False, zoom_radio=1, labels=True):
     xlim, ylim = [], []
     tgt_mu, _  = classes_mean[target_class]
-    tgt_mu = tgt_mu.numpy().flatten()
+    # tgt_mu = tgt_mu.numpy().flatten()
+    tgt_mu = tgt_mu.flatten()
     zoomed_xmin, zoomed_xmax = tgt_mu[0]-zoom_radio, tgt_mu[0]+zoom_radio
     zoomed_ymin, zoomed_ymax = tgt_mu[1]-zoom_radio, tgt_mu[1]+zoom_radio
     for c in range(10):
         mu, sigma = classes_mean[c]
-        mu = mu.numpy().flatten()
-        sigma = sigma.numpy().flatten()
+        mu = mu.flatten()
+        sigma = sigma.flatten()
+        # mu = mu.numpy().flatten()
+        # sigma = sigma.numpy().flatten()
         # Initializing the covariance matrix
         cov = np.diag(sigma)
         x, y = np.meshgrid(np.linspace(-3, 3, 50), np.linspace(-3, 3, 50))
@@ -217,38 +220,36 @@ def plot_gaussians(classes_mean, class_names, target_class, cmaps, ax, zoomed=Fa
     return ax, xlim, ylim
 
 
-def plot_vae2d_trajectory(vae_2d, trajectory, train_loader, target_class, class_names, 
+def plot_vae_trajectory(vae, trajectories, target_class, class_names, 
                           figsize=10, zoom_radius = 1, mark_origin=False):
-    # Initializing the random seed
-    random_seed=1000
     cmaps = [
     "coolwarm", "viridis", "plasma", "cividis", "magma", 
     "inferno", "Blues", "Greens", "Purples", "Reds"]
     # Create figure and axs[0]is
     
-    
-    latents_mean, latents_stdvar, labels = get_data_predictions(vae_2d, train_loader)
-    classes_mean = get_classes_mean(train_loader, labels, latents_mean, latents_stdvar)
+    labels = list(vae.prototypes.keys())
+    latents_stdvar = {k: v[1] for k, v in vae.prototypes.items()}
     fig1, axs1 = plt.subplots(figsize=(figsize*2, figsize))
     fig2, axs2 = plt.subplots(figsize=(figsize*2, figsize))
     # traj = np.cumsum(np.random.randn(300, 2) * 0.5, axs[0]is=0)  # Random walk
     axs = [axs1, axs2]
-    markersize = 0 if len(trajectory)< 100 else 5
+    markersize = 0 if len(trajectories[0])< 100 else 5
     
-    axs[0], xlim, ylim = plot_gaussians(classes_mean, class_names, target_class,  cmaps, axs[0], zoomed=True, zoom_radio = zoom_radius)
+    axs[0], xlim, ylim = plot_gaussians(vae.prototypes, class_names, target_class,  cmaps, axs[0], zoomed=True, zoom_radio = zoom_radius)
         # Plot contour
     xlim = np.array(xlim)
     ylim = np.array(ylim)
     axs[0].set_xlim(min(xlim[:,0]), max(xlim[:,1]))  # Force visible range
     axs[0].set_ylim(min(ylim[:,0]), max(ylim[:,1]))  # Force visible range  
     
-    axs[1], _,_ = plot_gaussians(classes_mean, class_names, target_class, cmaps, axs[1])
+    axs[1], _,_ = plot_gaussians(vae.prototypes, class_names, target_class, cmaps, axs[1])
     
 
-    mu, sigma = classes_mean[target_class]
-    mu = mu.numpy().flatten()
-    colors = [cplt.to_hex(cm.tab10(i)) for i in range(len(trajectory))]
-    for i, traj in enumerate(trajectory):
+    mu, sigma = vae.prototypes[target_class]
+    mu = mu.flatten()
+    # mu = mu.numpy().flatten()
+    colors = [cplt.to_hex(cm.tab10(i)) for i in range(len(trajectories[0]))]
+    for i, traj in enumerate(trajectories):
         axs[1].plot(traj[:, 0], traj[:, 1], color=colors[i], linewidth=2, zorder=11, alpha=0.6)  
         axs[0].scatter(traj[-1, 0], traj[-1, 1], color=colors[i], label="End", s=1200, zorder=16, edgecolor='black', marker = "*")
         
@@ -333,3 +334,60 @@ def fig_to_image(fig):
     buf.seek(0)
     img = Image.open(buf)
     return img
+
+#%%
+"""
+Legacy code
+"""
+
+def plot_vae2d_trajectory_legacy(vae_2d, trajectory, train_loader, target_class, class_names, 
+                          figsize=10, zoom_radius = 1, mark_origin=False):
+    # Initializing the random seed
+    random_seed=1000
+    cmaps = [
+    "coolwarm", "viridis", "plasma", "cividis", "magma", 
+    "inferno", "Blues", "Greens", "Purples", "Reds"]
+    # Create figure and axs[0]is
+    
+    
+    latents_mean, latents_stdvar, labels = get_data_predictions(vae_2d, train_loader)
+    classes_mean = get_classes_mean(train_loader, labels, latents_mean, latents_stdvar)
+    fig1, axs1 = plt.subplots(figsize=(figsize*2, figsize))
+    fig2, axs2 = plt.subplots(figsize=(figsize*2, figsize))
+    # traj = np.cumsum(np.random.randn(300, 2) * 0.5, axs[0]is=0)  # Random walk
+    axs = [axs1, axs2]
+    markersize = 0 if len(trajectory)< 100 else 5
+    
+    axs[0], xlim, ylim = plot_gaussians(classes_mean, class_names, target_class,  cmaps, axs[0], zoomed=True, zoom_radio = zoom_radius)
+        # Plot contour
+    xlim = np.array(xlim)
+    ylim = np.array(ylim)
+    axs[0].set_xlim(min(xlim[:,0]), max(xlim[:,1]))  # Force visible range
+    axs[0].set_ylim(min(ylim[:,0]), max(ylim[:,1]))  # Force visible range  
+    
+    axs[1], _,_ = plot_gaussians(classes_mean, class_names, target_class, cmaps, axs[1])
+    
+
+    mu, sigma = classes_mean[target_class]
+    mu = mu.numpy().flatten()
+    colors = [cplt.to_hex(cm.tab10(i)) for i in range(len(trajectory))]
+    for i, traj in enumerate(trajectory):
+        axs[1].plot(traj[:, 0], traj[:, 1], color=colors[i], linewidth=2, zorder=11, alpha=0.6)  
+        axs[0].scatter(traj[-1, 0], traj[-1, 1], color=colors[i], label="End", s=1200, zorder=16, edgecolor='black', marker = "*")
+        
+        axs[0].plot(traj[:, 0], traj[:, 1], marker='o', markersize=8,   color=colors[i], linewidth=1, zorder=11, alpha=0.6, label =f'Traj. {i+1}' ) 
+        axs[1].scatter(traj[-1, 0], traj[-1, 1], color=colors[i], s=1200, zorder=16, edgecolor='black', marker = "*")
+        
+    axs[1].scatter(mu[0], mu[1], color='black', label="Prototype", s=1200, zorder=15, edgecolor='white', marker = "*")
+    if mark_origin: 
+        axs[1].plot(0, 0, color='black', zorder=15, ms=20, marker='x', mec='black', mew=5, ls="none")
+        # axs[0].scatter(0, 0, color='black', s=500, zorder=15, marker = "X")
+    axs[0].scatter(mu[0], mu[1], color='black', label="Prototype", s=1200, zorder=15, edgecolor='white', marker = "*")
+    
+    axs[0].set_xlim(mu[0] - zoom_radius, mu[0] + zoom_radius)
+    axs[0].set_ylim(mu[1] - zoom_radius, mu[1] + zoom_radius)
+    # axs[0]s[1].set_xlim(x_min, x_maxs[0])  # Force visible range
+    # axs[0]s[1].set_ylim(y_min, y_maxs[0])  # Force visible range  
+    legend = axs[0].legend(title=f"Towards {class_names[target_class]}", fontsize =46 )
+    legend.get_title().set_fontsize('46') #legend 'Title' fontsize
+    return fig1, axs1, fig2, axs2, colors

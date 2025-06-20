@@ -5,14 +5,14 @@ Created on Wed Feb 19 11:39:45 2025
 
 @author: alexolza
 """
-
+from tqdm import tqdm
 import torch
 from matplotlib import pyplot as plt
 from components.generators import  get_data_predictions, get_classes_mean
 import numpy as np
 import random
 from scipy.spatial.distance import euclidean
-from visualization.plotting import show_image, show_images_grid, plot_vae2d_trajectory, plot_vae2d_random_trajectory
+from visualization.plotting import show_image, show_images_grid, plot_vae_trajectory, plot_vae2d_random_trajectory
 import matplotlib.cm as cm
 from matplotlib import colors as cplt
 from components.update_rules import fp0
@@ -20,7 +20,7 @@ from components.update_rules import fp0
 def minimal_loop(train_loader, generator, discriminator, target_class, lambda_, n_iter, device,  
                  update_rule_func, p_scale_func=fp0,#identity_f_p, 
                  z_current=None, ignore_discriminator = 0, random_state=0, noise_sigma=torch.tensor(1.0),
-                 warm_up = 5, stop_eps=1e-3,
+                 warm_up = 5, stop_eps=1e-3, early_stopping=False,
                  **update_rule_kwargs):
     torch.manual_seed(random_state)
     random.seed(random_state)
@@ -43,32 +43,37 @@ def minimal_loop(train_loader, generator, discriminator, target_class, lambda_, 
     generated_images=[X0[0].cpu().detach().numpy()]
     probabilities = [p.item()]
     all_probabilities = [p.item()]
-    trajectory =[z_current.numpy().flatten()]
+    trajectory = [z_current.numpy().flatten()] # This gathers moves that produce feedback
+    all_trajectory = [z_current.numpy().flatten()] # This also considers warm-up moves
     sigmas = [noise_sigma]
     past_probabilities_mean = p.to(device)
     recent_probabilities_mean = p.to(device)
     patience0 = 25
     patience=patience0
-    for i in range(1, n_iter+1):
-        if i>=150: 
-            if (recent_probabilities_mean.item()>= 0.9) or sigmas[-1]<0.1:
-                patience-=1
-            else:
-                patience = patience0
-        if patience==0: print(f'iter {i}, Early Stopping'); break
+    for i in tqdm(range(1, n_iter+1)):
+        if early_stopping:
+            if i>=150: 
+                if (recent_probabilities_mean.item()>= 0.9) or sigmas[-1]<0.1:
+                    patience-=1
+                else:
+                    patience = patience0
+            if patience==0: print(f'iter {i}, Early Stopping'); break
         if i>1:
             recent_probabilities_mean = torch.tensor(np.mean(all_probabilities[-i*warm_up:])).to(device)
             past_probabilities_mean = torch.tensor(np.mean(all_probabilities[-(i+1)*warm_up: -i*warm_up])).to(device)
             # print(past_probabilities_mean, recent_probabilities_mean, sigmas[-1], z_current)
         for j in range(2*warm_up): 
-            # TODO: Modify to accomodate URs with memory (potentially passing the whole trajectory and dealing with it inside the UR func)
-            z_new, _ = update_rule_func(z_current, recent_probabilities_mean, lambda_, p_scale_func, p0=past_probabilities_mean, 
+            # There is no feedback during warm-up
+            z_new, _ = update_rule_func(all_trajectory, recent_probabilities_mean, past_probabilities_mean, lambda_, p_scale_func,
                                         noise_sigma_0 = sigmas[-1].to(device), sigma0=sigmas[-1], 
+                                        warm_up=True,
+                                        seed=j,
                                         **update_rule_kwargs)
             z_new = z_new.float()
             x_decoded = generator.decoder(z_new.to(device), generator.target_size)
-            z_current = z_new
-
+            # z_current = z_new
+            all_trajectory.append(z_new.cpu().numpy().flatten())
+            
             if ignore_discriminator==0:
                 with torch.no_grad():
                     p =  torch.nn.Softmax()(discriminator(x_decoded).flatten())[idx]
@@ -80,10 +85,12 @@ def minimal_loop(train_loader, generator, discriminator, target_class, lambda_, 
             
         with torch.no_grad():
             if noise_sigma > 1e-2: 
-                z_new, noise_sigma = update_rule_func(z_current, recent_probabilities_mean, lambda_, p_scale_func, p0=past_probabilities_mean, 
-                                                      noise_sigma_0 = sigmas[-1].to(device), sigma0=sigmas[-1], 
-                                                      **update_rule_kwargs)
-            sigmas.append(noise_sigma)
+                z_new, noise_sigma = update_rule_func(trajectory, recent_probabilities_mean, past_probabilities_mean, lambda_, p_scale_func,
+                                                        noise_sigma_0 = sigmas[-1].to(device), sigma0=sigmas[-1], 
+                                                        warm_up=False,
+                                                        seed=i,
+                                                        **update_rule_kwargs)            
+                sigmas.append(noise_sigma)
             z_new = z_new.float()
             x_decoded = generator.decoder(z_new.to(device), generator.target_size)
             
@@ -95,8 +102,9 @@ def minimal_loop(train_loader, generator, discriminator, target_class, lambda_, 
 
             all_probabilities.append(p.item())
             generated_images.append(x_decoded[0].cpu().detach().numpy())
-            z_current = z_new
+            # z_current = z_new
             trajectory.append(z_new.cpu().numpy().flatten())
+            all_trajectory.append(z_new.cpu().numpy().flatten())
             
         probabilities.append(recent_probabilities_mean.item()) 
     sigmas = np.array(sigmas)
