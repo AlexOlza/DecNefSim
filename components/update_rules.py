@@ -119,11 +119,11 @@ def update_z_moving_normal_drift_adaptive_variance(trajectory, p, p0, lambda_val
     # z_new =  (1-lambda_val * p) * z.to(device) + lambda_val * (1-p) * normal_update # blowing dist and sigma!!!!!!!!!
     return z_new, noise_sigma
 
-def update_z_moving_normal_drift_adaptive_variance_memory(trajectory, p, p0, lambda_val, f_p, warm_up = False, device='cuda', max_sigma=1, noise_sigma_0 =1, seed=0, **f_p_kwargs):
+def update_z_moving_normal_drift_adaptive_variance_memory(trajectory, p, p0, lambda_val, f_p, warm_up = False, device='cuda', max_sigma=1, noise_sigma_0 =1, seed=0, verbose=False, **f_p_kwargs):
     z  = torch.tensor(trajectory[-1])
     retreat = True if ((p<0.75*p0) and (not warm_up)) else False
     if retreat: # This will be true if z_{i+1} is worse than z_i
-        print(f'Retreat p/p0={p/p0}')
+        if verbose: print(f'Retreat p/p0={p/p0}')
         z_previous = torch.tensor(trajectory[-2])    
         # Since z_{i+1} was bad, we return to z_i and we adopt a more exploratory strategy 
         noise_sigma = ((1-lambda_val) *noise_sigma_0 + lambda_val * f_p(p.cpu(), p0.cpu(), **f_p_kwargs)).cpu()

@@ -50,7 +50,7 @@ def minimal_loop(train_loader, generator, discriminator, target_class, lambda_, 
     recent_probabilities_mean = p.to(device)
     patience0 = 25
     patience=patience0
-    for i in tqdm(range(1, n_iter+1)):
+    for i in range(1, n_iter+1):
         if early_stopping:
             if i>=150: 
                 if (recent_probabilities_mean.item()>= 0.9) or sigmas[-1]<0.1:
