@@ -7,6 +7,7 @@ Created on Wed Jul  2 12:30:15 2025
 """
 
 import argparse
+update_rule_names = ['MNDAV', 'MNDAVMem']
 def traditional_decnef_n_instances_parser():
     parser = argparse.ArgumentParser(
                         prog='traditional_decnef_n_instances',
@@ -27,5 +28,8 @@ def traditional_decnef_n_instances_parser():
     parser.add_argument('--generator_name', type= str, required = False, default='VAE')
     parser.add_argument('--discriminator_type', type= str, required = False, default='CNN')
 
+    c0 = parser.parse_args()
+    parser.add_argument('--update_rule_name', type= str, required = False, default=update_rule_names[c0.update_rule_idx])
+    # parser.parse_args(args=['--update_rule_name', update_rule_names[c0.update_rule_idx]], namespace=c0)
     config = parser.parse_args()
     return config

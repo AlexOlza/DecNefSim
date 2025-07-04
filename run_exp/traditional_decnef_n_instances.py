@@ -123,10 +123,12 @@ else:
 
 trajectory_dir = os.path.join(outpath,f'TRAJS_{generator_name}_{discriminator_name}',f'UR{update_rule_name}',f'IGDIS{config.ignore_discriminator}')
 if not os.path.exists(trajectory_dir): os.makedirs(trajectory_dir)
-for trajectory_random_seed in tqdm(range(config.trajectory_random_seed_init,
-                                    config.trajectory_random_seed_init + config.n_trajectories + 1)):
+for trajectory_random_seed in range(config.trajectory_random_seed_init,
+                                    config.trajectory_random_seed_init + config.n_trajectories + 1):
     #%%
     trajectory_name = f'TRAJ{trajectory_random_seed}_{generator_name}_{discriminator_name}_UR{update_rule_name}_IGDIS{config.ignore_discriminator}'
+    trajectory_fname = os.path.join(trajectory_dir, f'{trajectory_name}.npz')
+    if os.path.exists(trajectory_fname): print('Found'); continue
     generated_images,\
     trajectory,\
     probabilities,\
@@ -142,11 +144,11 @@ for trajectory_random_seed in tqdm(range(config.trajectory_random_seed_init,
                                        start_from_origin=True,
                                        )
     #%%
-    np.savez_compressed(os.path.join(trajectory_dir, f'{trajectory_name}.npz'), 
+    np.savez_compressed(trajectory_fname, 
                         generated_images = generated_images,
                         trajectory = trajectory,
                         probabilities = probabilities,
                         all_probabilities = all_probabilities,
                         sigma = sigma
                         )
-    print('Saved ',os.path.join(trajectory_dir, f'{trajectory_name}.npz'), ', exiting.')
+    # print('Saved ',os.path.join(trajectory_dir, f'{trajectory_name}.npz'), ', exiting.')

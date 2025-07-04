@@ -25,6 +25,28 @@ from PIL import Image
 from scipy.stats import multivariate_normal
 from components.generators import get_data_predictions, get_classes_mean
 
+def evolution_with_CI(df, title, ylabel, fname=None):
+    df['time'] = df.index  # Add time index
+
+    # Melt the DataFrame so each row is (time, sample, value)
+    df_long = df.melt(id_vars='time', var_name='sample', value_name='value')
+    
+    plt.figure(figsize=(8, 6))
+    sns.lineplot(data=df_long, x='time', y='value',
+                 estimator=np.mean, ci=95)
+    plt.title(title)
+    plt.xlabel('Iteration')
+    plt.ylabel(ylabel)
+    if fname:
+        plt.tight_layout()
+        plt.savefig(fname)
+    plt.show()
+    
+def show_NANs(df, dfname):
+    plt.title(f'NAN values in {dfname}')
+    sns.heatmap(df) 
+    plt.show()
+
 def show_images_grid(images, class_num, ax, title, title_color='black', text=[], title_fontsize=26):
     grid = make_grid(images, nrow=class_num, normalize=True).permute(1,2,0).numpy()
     ax.imshow(grid)
